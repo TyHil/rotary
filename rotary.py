@@ -66,50 +66,55 @@ async def routeNumbers(mainQueue: asyncio.Queue, firstQueue: asyncio.Queue, seco
         number = await mainQueue.get()
         if number >= 1 and number <= 4:
             await firstQueue.put(number)
-            mainQueue.task_done()
-        elif number >= 5 and number <= 7:
+        elif number >= 5 and number <= 6:
             await secondQueue.put(number)
-            mainQueue.task_done()
+        elif number == 7:
+            await asyncio.gather(firstQueue.put(number), secondQueue.put(number))
+        mainQueue.task_done()
         await asyncio.sleep(0.1)
 
 
 
 async def smartThings(queue: asyncio.Queue):
     async with aiohttp.ClientSession() as session:
-        ledStrip = 0
-        bedsideLamp = 0
-        allOn = 0
-        allOff = 0
+        ledStrip = {}
+        bedsideLamp = {}
+        allDevices = {}
 
         api = pysmartthings.SmartThings(session, smartThingsToken)
         print('Smart Things starting...')
-        devices = await api.devices()
+        for device in await api.devices(): #categorize devices
+            if device.label == 'LED Strip On':
+                ledStrip['on'] = device
+            elif device.label == 'LED Strip Off':
+                ledStrip['off'] = device
+            elif device.label == 'LED Strip Toggle':
+                ledStrip['toggle'] = device
+            elif device.label == 'Bedside Lamp On':
+                bedsideLamp['on'] = device
+            elif device.label == 'Bedside Lamp Off':
+                bedsideLamp['off'] = device
+            elif device.label == 'Bedside Lamp Toggle':
+                bedsideLamp['toggle'] = device
+            elif device.label == 'All On':
+                allDevices['on'] = device
+            elif device.label == 'All Off':
+                allDevices['off'] = device
         print('Smart Things ready.')
-        for i in range(len(devices)): #categorize devices
-            if devices[i].label == 'LED Strip Toggle':
-                ledStrip = i
-            elif devices[i].label == 'Bedside Lamp Toggle':
-                bedsideLamp = i
-            elif devices[i].label == 'All On':
-                allOn = i
-            elif devices[i].label == 'All Off':
-                allOff = i
 
         while True: #consumer
             number = await queue.get()
             if number == 1:
-                await devices[allOn].command('main', 'switch', 'on')
-                queue.task_done()
+                await allDevices['on'].command('main', 'switch', 'on')
             elif number == 2:
-                await devices[allOff].command('main', 'switch', 'on')
-                queue.task_done()
+                await allDevices['off'].command('main', 'switch', 'on')
             elif number == 3:
-                await devices[ledStrip].command('main', 'switch', 'on')
-                queue.task_done()
+                await ledStrip['toggle'].command('main', 'switch', 'on')
             elif number == 4:
-                print('smarthi4')
-                await devices[bedsideLamp].command('main', 'switch', 'on')
-                queue.task_done()
+                await bedsideLamp['toggle'].command('main', 'switch', 'on')
+            elif number == 7:
+                await bedsideLamp['off'].command('main', 'switch', 'on')
+            queue.task_done()
             await asyncio.sleep(0.1)
 
 def sendToArduino(data): #brightness, mode, [r, g, b]
@@ -130,13 +135,11 @@ async def arduino(queue: asyncio.Queue):
         number = await queue.get()
         if number == 5:
             sendToArduino([51, 5])
-            queue.task_done()
         elif number == 6:
             sendToArduino([51, 11])
-            queue.task_done()
         elif number == 7:
-            sendToArduino([85, 16, 255, 20, 147])
-            queue.task_done()
+            sendToArduino([85, 16, 255, 105, 180])
+        queue.task_done()
         await asyncio.sleep(0.1)
 
 
