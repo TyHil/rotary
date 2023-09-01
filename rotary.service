@@ -1,0 +1,13 @@
+[Unit]
+Description=Rotary Phone Control
+After=multi-user.target
+
+[Service]
+Type=simple
+User=tylerhill
+ExecStart=/usr/bin/python3 /home/tylerhill/Desktop/rotary/rotary.py
+Restart=on-failure
+RestartSec=1s
+
+[Install]
+WantedBy=multi-user.target
