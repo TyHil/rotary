@@ -76,48 +76,56 @@ async def routeNumbers(mainQueue: asyncio.Queue, firstQueue: asyncio.Queue, seco
 
 
 async def smartThings(queue: asyncio.Queue):
-    async with aiohttp.ClientSession() as session:
-        ledStrip = {}
-        bedsideLamp = {}
-        allDevices = {}
+    while True:
+        try:
+            print('Smart Things connecting...')
+            async with aiohttp.ClientSession() as session:
+                ledStrip = {}
+                bedsideLamp = {}
+                allDevices = {}
 
-        api = pysmartthings.SmartThings(session, smartThingsToken)
-        print('Smart Things starting...')
-        for device in await api.devices(): #categorize devices
-            if device.label == 'LED Strip On':
-                ledStrip['on'] = device
-            elif device.label == 'LED Strip Off':
-                ledStrip['off'] = device
-            elif device.label == 'LED Strip Toggle':
-                ledStrip['toggle'] = device
-            elif device.label == 'Bedside Lamp On':
-                bedsideLamp['on'] = device
-            elif device.label == 'Bedside Lamp Off':
-                bedsideLamp['off'] = device
-            elif device.label == 'Bedside Lamp Toggle':
-                bedsideLamp['toggle'] = device
-            elif device.label == 'All On':
-                allDevices['on'] = device
-            elif device.label == 'All Off':
-                allDevices['off'] = device
-        print('Smart Things ready.')
+                api = pysmartthings.SmartThings(session, smartThingsToken)
+                for device in await api.devices(): #categorize devices
+                    if device.label == 'LED Strip On':
+                        ledStrip['on'] = device
+                    elif device.label == 'LED Strip Off':
+                        ledStrip['off'] = device
+                    elif device.label == 'LED Strip Toggle':
+                        ledStrip['toggle'] = device
+                    elif device.label == 'Bedside Lamp On':
+                        bedsideLamp['on'] = device
+                    elif device.label == 'Bedside Lamp Off':
+                        bedsideLamp['off'] = device
+                    elif device.label == 'Bedside Lamp Toggle':
+                        bedsideLamp['toggle'] = device
+                    elif device.label == 'All On':
+                        allDevices['on'] = device
+                    elif device.label == 'All Off':
+                        allDevices['off'] = device
+                print('Smart Things connected.')
 
-        while True: #consumer
-            number = await queue.get()
-            if number == 1:
-                await allDevices['on'].command('main', 'switch', 'on')
-            elif number == 2:
-                await allDevices['off'].command('main', 'switch', 'on')
-            elif number == 3:
-                await ledStrip['toggle'].command('main', 'switch', 'on')
-            elif number == 4:
-                await bedsideLamp['toggle'].command('main', 'switch', 'on')
-            elif number == 7:
-                await bedsideLamp['off'].command('main', 'switch', 'on')
-            queue.task_done()
-            await asyncio.sleep(0.1)
+                while True: #consumer
+                    number = await queue.get()
+                    if number == 1:
+                        await allDevices['on'].command('main', 'switch', 'on')
+                    elif number == 2:
+                        await allDevices['off'].command('main', 'switch', 'on')
+                    elif number == 3:
+                        await ledStrip['toggle'].command('main', 'switch', 'on')
+                    elif number == 4:
+                        await bedsideLamp['toggle'].command('main', 'switch', 'on')
+                    elif number == 7:
+                        await bedsideLamp['off'].command('main', 'switch', 'on')
+                    queue.task_done()
+                    await asyncio.sleep(0.1)
+        except aiohttp.client_exceptions.ClientConnectorError:
+            print('Smart Things disconnected.')
+            await asyncio.sleep(1)
+        except:
+            break
 
 def sendToArduino(data): #brightness, mode, [r, g, b]
+    print(data)
     GPIO.output(UART_PIN, 0)
     ser = serial.Serial('/dev/ttyS0', 9600, timeout=1)
     ser.reset_input_buffer()
