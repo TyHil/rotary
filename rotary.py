@@ -1,3 +1,5 @@
+import sys
+
 import aiohttp
 import asyncio
 import pysmartthings
@@ -16,6 +18,10 @@ GPIO.setup(ROTARY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 UART_PIN = 7
 GPIO.setup(UART_PIN, GPIO.OUT)
 GPIO.output(UART_PIN, 1)
+
+def printToSystemd(*objects):
+    print(*objects)
+    sys.stdout.flush()
 
 
 
@@ -43,7 +49,7 @@ async def readRotary(queue: asyncio.Queue):
         buttonState = GPIO.input(ROTARY_PIN)
 
         if (millis() - lastStateChangeTime) > dialHasFinishedRotatingAfterMs and needToPrint:
-            print(count)
+            printToSystemd(count)
             await queue.put(count)
             needToPrint = 0
             count = 0
@@ -78,7 +84,7 @@ async def routeNumbers(mainQueue: asyncio.Queue, firstQueue: asyncio.Queue, seco
 async def smartThings(queue: asyncio.Queue):
     while True:
         try:
-            print('Smart Things connecting...')
+            printToSystemd('Smart Things connecting...')
             async with aiohttp.ClientSession() as session:
                 ledStrip = {}
                 bedsideLamp = {}
@@ -102,7 +108,7 @@ async def smartThings(queue: asyncio.Queue):
                         allDevices['on'] = device
                     elif device.label == 'All Off':
                         allDevices['off'] = device
-                print('Smart Things connected.')
+                printToSystemd('Smart Things connected.')
 
                 while True: #consumer
                     number = await queue.get()
@@ -119,13 +125,13 @@ async def smartThings(queue: asyncio.Queue):
                     queue.task_done()
                     await asyncio.sleep(0.1)
         except aiohttp.client_exceptions.ClientConnectorError:
-            print('Smart Things disconnected.')
+            printToSystemd('Smart Things disconnected.')
             await asyncio.sleep(1)
         except:
             break
 
 def sendToArduino(data): #brightness, mode, [r, g, b]
-    print(data)
+    printToSystemd(data)
     GPIO.output(UART_PIN, 0)
     ser = serial.Serial('/dev/ttyS0', 9600, timeout=1)
     ser.reset_input_buffer()
@@ -134,7 +140,7 @@ def sendToArduino(data): #brightness, mode, [r, g, b]
     while millis() - temp < 2000:
         if ser.in_waiting > 0:
             line = ser.readline()#.decode('utf-8').rstrip()
-            print(type(line), line)#[0], line[1], line[2], line[3], line[4])'''
+            printToSystemd(type(line), line)#[0], line[1], line[2], line[3], line[4])'''
     ser.close()
     GPIO.output(UART_PIN, 1)
 
