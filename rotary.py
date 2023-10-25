@@ -1,23 +1,11 @@
-import sys
-
-import aiohttp
 import asyncio
-import pysmartthings
 
 import RPi.GPIO as GPIO
 GPIO.setmode(GPIO.BOARD)
-import time
 
-import serial
 
-smartThingsToken = 'API_KEY'
 
-ROTARY_PIN = 12
-GPIO.setup(ROTARY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-UART_PIN = 7
-GPIO.setup(UART_PIN, GPIO.OUT)
-GPIO.output(UART_PIN, 1)
+import sys
 
 def printToSystemd(*objects):
     print(*objects)
@@ -25,17 +13,24 @@ def printToSystemd(*objects):
 
 
 
+import time
+
+def millis():
+    return time.time_ns() // 1_000_000
+
+
+
 async def main():
-    rotaryQueue, smartThingsQueue, arduinoQueue = asyncio.Queue(), asyncio.Queue(), asyncio.Queue()
+    rotaryQueue, smartThingsQueue, arduinoQueue, restartQueue = asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue()
     producer = asyncio.create_task(readRotary(rotaryQueue))
-    router = asyncio.create_task(routeNumbers(rotaryQueue, smartThingsQueue, arduinoQueue))
-    consumers = [asyncio.create_task(smartThings(smartThingsQueue)), asyncio.create_task(arduino(arduinoQueue))]
+    router = asyncio.create_task(routeNumbers(rotaryQueue, [smartThingsQueue, arduinoQueue, restartQueue]))
+    consumers = [asyncio.create_task(smartThings(smartThingsQueue)), asyncio.create_task(arduino(arduinoQueue)), asyncio.create_task(restart(restartQueue))]
     await asyncio.gather(producer, router, *consumers)
 
 
 
-def millis():
-    return time.time_ns() // 1_000_000
+ROTARY_PIN = 12
+GPIO.setup(ROTARY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 async def readRotary(queue: asyncio.Queue):
     lastState = False
@@ -67,19 +62,26 @@ async def readRotary(queue: asyncio.Queue):
 
 
 
-async def routeNumbers(mainQueue: asyncio.Queue, firstQueue: asyncio.Queue, secondQueue: asyncio.Queue):
+async def routeNumbers(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
     while True:
-        number = await mainQueue.get()
+        number = await inQueue.get()
         if number >= 1 and number <= 4:
-            await firstQueue.put(number)
+            await outQueues[0].put(number)
         elif number >= 5 and number <= 6:
-            await secondQueue.put(number)
+            await outQueues[1].put(number)
         elif number == 7:
-            await asyncio.gather(firstQueue.put(number), secondQueue.put(number))
-        mainQueue.task_done()
+            await asyncio.gather(outQueues[0].put(number), outQueues[1].put(number))
+        elif number == 10:
+            await outQueues[2].put(number)
+        inQueue.task_done()
         await asyncio.sleep(0.1)
 
 
+
+import aiohttp
+import pysmartthings
+
+smartThingsToken = 'API_KEY'
 
 async def smartThings(queue: asyncio.Queue):
     while True:
@@ -130,6 +132,14 @@ async def smartThings(queue: asyncio.Queue):
         except:
             break
 
+
+
+import serial
+
+UART_PIN = 7
+GPIO.setup(UART_PIN, GPIO.OUT)
+GPIO.output(UART_PIN, 1)
+
 def sendToArduino(data): #brightness, mode, [r, g, b]
     printToSystemd(data)
     GPIO.output(UART_PIN, 0)
@@ -155,6 +165,19 @@ async def arduino(queue: asyncio.Queue):
             sendToArduino([85, 16, 255, 105, 180])
         queue.task_done()
         await asyncio.sleep(0.1)
+
+
+
+import os
+
+async def restart(queue: asyncio.Queue):
+    while True:
+        number = await queue.get()
+        if number == 10:
+            os.execl(sys.executable, sys.executable, *sys.argv)
+        queue.task_done()
+        await asyncio.sleep(0.1)
+
 
 
 if __name__ == '__main__':
