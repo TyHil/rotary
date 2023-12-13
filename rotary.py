@@ -80,8 +80,7 @@ async def routeNumbers(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
 
 import aiohttp
 import pysmartthings
-
-smartThingsToken = 'API_KEY'
+import config # defines smartThingsToken
 
 async def smartThings(queue: asyncio.Queue):
     while True:
@@ -92,7 +91,7 @@ async def smartThings(queue: asyncio.Queue):
                 bedsideLamp = {}
                 allDevices = {}
 
-                api = pysmartthings.SmartThings(session, smartThingsToken)
+                api = pysmartthings.SmartThings(session, config.smartThingsToken)
                 for device in await api.devices(): #categorize devices
                     if device.label == 'LED Strip On':
                         ledStrip['on'] = device
