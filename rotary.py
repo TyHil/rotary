@@ -119,9 +119,9 @@ async def smartThings(queue: asyncio.Queue):
                     elif number == 2:
                         await allDevices['off'].command('main', 'switch', 'on')
                     elif number == 3:
-                        await ledStrip['toggle'].command('main', 'switch', 'on')
-                    elif number == 4:
                         await bedsideLamp['toggle'].command('main', 'switch', 'on')
+                    elif number == 4:
+                        await ledStrip['toggle'].command('main', 'switch', 'on')
                     elif number == 7:
                         await bedsideLamp['off'].command('main', 'switch', 'on')
                     queue.task_done()
