@@ -20,15 +20,6 @@ def millis():
 
 
 
-async def main():
-    rotaryQueue, smartThingsQueue, arduinoQueue, restartQueue = asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue()
-    producer = asyncio.create_task(readRotary(rotaryQueue))
-    router = asyncio.create_task(routeNumbers(rotaryQueue, [smartThingsQueue, arduinoQueue, restartQueue]))
-    consumers = [asyncio.create_task(smartThings(smartThingsQueue)), asyncio.create_task(arduino(arduinoQueue)), asyncio.create_task(restart(restartQueue))]
-    await asyncio.gather(producer, router, *consumers)
-
-
-
 ROTARY_PIN = 12
 GPIO.setup(ROTARY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
@@ -65,14 +56,16 @@ async def readRotary(queue: asyncio.Queue):
 async def routeNumbers(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
     while True:
         number = await inQueue.get()
-        if number >= 1 and number <= 4:
+        if number == 1 or number == 2 or number == 3 or number == 4:
             await outQueues[0].put(number)
-        elif number >= 5 and number <= 6:
+        elif number == 5 or number == 6:
             await outQueues[1].put(number)
         elif number == 7:
             await asyncio.gather(outQueues[0].put(number), outQueues[1].put(number))
-        elif number == 10:
+        elif number == 8 or number == 9:
             await outQueues[2].put(number)
+        elif number == 10:
+            await outQueues[3].put(number)
         inQueue.task_done()
         await asyncio.sleep(0.1)
 
@@ -156,14 +149,55 @@ def sendToArduino(data): #brightness, mode, [r, g, b]
 async def arduino(queue: asyncio.Queue):
     while True:
         number = await queue.get()
-        if number == 5:
+        if number == 5: # white
             sendToArduino([51, 5])
-        elif number == 6:
+        elif number == 6: # RGB
             sendToArduino([51, 11])
-        elif number == 7:
+        elif number == 7: # pink
             sendToArduino([85, 16, 255, 105, 180])
         queue.task_done()
         await asyncio.sleep(0.1)
+
+
+
+
+alarmOn = True
+alarmSkip = False
+
+def alarmResponse():
+    if not(alarmOn):
+        sendToArduino([51, 16, 255, 0, 0])
+        time.sleep(2)
+        sendToArduino([51, 11])
+    else:
+        if alarmSkip:
+            sendToArduino([51, 16, 255, 255, 0])
+            time.sleep(2)
+            sendToArduino([51, 11])
+        else:
+            sendToArduino([51, 16, 0, 255, 0])
+            time.sleep(2)
+            sendToArduino([51, 11])
+
+async def alarmToggle(queue: asyncio.Queue):
+    global alarmOn, alarmSkip
+    while True:
+        number = await queue.get()
+        if number == 8: # skip toggle
+            alarmSkip = not(alarmSkip)
+            alarmResponse()
+        elif number == 9: # on/off toggle
+            alarmOn = not(alarmOn)
+            alarmResponse()
+        print(alarmOn, alarmSkip)
+        queue.task_done()
+        await asyncio.sleep(0.1)
+
+async def alarm():
+    sendToArduino([17, 5])
+    for brightness in range(17*2, 17*6+1, 17):
+        await asyncio.sleep(60*5) # 2
+        sendToArduino([brightness, 5])
 
 
 
@@ -178,6 +212,32 @@ async def restart(queue: asyncio.Queue):
         await asyncio.sleep(0.1)
 
 
+
+async def rotary():
+    rotaryQueue, smartThingsQueue, arduinoQueue, alarmToggleQueue, restartQueue = asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue()
+    producer = asyncio.create_task(readRotary(rotaryQueue))
+    router = asyncio.create_task(routeNumbers(rotaryQueue, [smartThingsQueue, arduinoQueue, alarmToggleQueue, restartQueue]))
+    consumers = [asyncio.create_task(smartThings(smartThingsQueue)), asyncio.create_task(arduino(arduinoQueue)), asyncio.create_task(alarmToggle(alarmToggleQueue)), asyncio.create_task(restart(restartQueue))]
+    await asyncio.gather(producer, router, *consumers)
+
+
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+async def alarmSchedule():
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(alarm, 'cron', year="*", month="*", day="*", hour="10", minute="30") # hour="*", minute="*", second="40")
+    scheduler.start()
+    try:
+        while True:
+            await asyncio.sleep(1)
+    except (KeyboardInterrupt, SystemExit):
+        scheduler.shutdown()
+
+
+
+async def main():
+    await asyncio.gather(rotary(), alarmSchedule())
 
 if __name__ == '__main__':
     asyncio.run(main())
