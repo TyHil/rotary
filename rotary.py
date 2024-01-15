@@ -75,7 +75,10 @@ import aiohttp
 import pysmartthings
 import config # defines smartThingsToken
 
+ledStripOn = None # for alarm
+
 async def smartThings(queue: asyncio.Queue):
+    global ledStripOn
     while True:
         try:
             printToSystemd('Smart Things connecting...')
@@ -88,6 +91,7 @@ async def smartThings(queue: asyncio.Queue):
                 for device in await api.devices(): #categorize devices
                     if device.label == 'LED Strip On':
                         ledStrip['on'] = device
+                        ledStripOn = device
                     elif device.label == 'LED Strip Off':
                         ledStrip['off'] = device
                     elif device.label == 'LED Strip Toggle':
@@ -194,10 +198,16 @@ async def alarmToggle(queue: asyncio.Queue):
         await asyncio.sleep(0.1)
 
 async def alarm():
-    sendToArduino([17, 5])
-    for brightness in range(17*2, 17*6+1, 17):
-        await asyncio.sleep(60*5) # 2
-        sendToArduino([brightness, 5])
+    global alarmOn, alarmSkip
+    global ledStripOn
+    if alarmOn and not(alarmSkip) and ledStripOn is not None:
+        await ledStripOn.command('main', 'switch', 'on')
+        await asyncio.sleep(10)
+        sendToArduino([17, 5])
+        for brightness in range(17*2, 17*6+1, 17):
+            await asyncio.sleep(60*5) # 2
+            sendToArduino([brightness, 5])
+    alarmSkip = False
 
 
 
@@ -226,7 +236,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 async def alarmSchedule():
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(alarm, 'cron', year="*", month="*", day="*", hour="10", minute="30") # hour="*", minute="*", second="40")
+    scheduler.add_job(alarm, 'cron', year="*", month="*", day="*", hour="*", minute="*", second="20")#hour="10", minute="30") # hour="*", minute="*", second="40")
     scheduler.start()
     try:
         while True:
