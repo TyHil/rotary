@@ -236,7 +236,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 async def alarmSchedule():
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(alarm, 'cron', year="*", month="*", day="*", hour="*", minute="*", second="20")#hour="10", minute="30") # hour="*", minute="*", second="40")
+    scheduler.add_job(alarm, 'cron', year="*", month="*", day="*", hour="10", minute="30") # hour="*", minute="*", second="40")
     scheduler.start()
     try:
         while True:
