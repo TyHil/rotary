@@ -75,7 +75,9 @@ import aiohttp
 import pysmartthings
 import config # defines smartThingsToken
 
-ledStripOn = None # for alarm
+# for alarm
+ledStripOn = None
+bedsideLampOn = None
 
 async def smartThings(queue: asyncio.Queue):
     global ledStripOn
@@ -98,6 +100,7 @@ async def smartThings(queue: asyncio.Queue):
                         ledStrip['toggle'] = device
                     elif device.label == 'Bedside Lamp On':
                         bedsideLamp['on'] = device
+                        bedsideLampOn = device
                     elif device.label == 'Bedside Lamp Off':
                         bedsideLamp['off'] = device
                     elif device.label == 'Bedside Lamp Toggle':
@@ -136,29 +139,34 @@ UART_PIN = 7
 GPIO.setup(UART_PIN, GPIO.OUT)
 GPIO.output(UART_PIN, 1)
 
-def sendToArduino(data): #brightness, mode, [r, g, b]
-    printToSystemd(data)
+def sendToArduinoRaw(data, waitResponse=False): #brightness, mode, [r, g, b]
     GPIO.output(UART_PIN, 0)
     ser = serial.Serial('/dev/ttyS0', 9600, timeout=1)
     ser.reset_input_buffer()
     ser.write(bytes(data))
-    '''temp = millis()
-    while millis() - temp < 2000:
-        if ser.in_waiting > 0:
-            line = ser.readline()#.decode('utf-8').rstrip()
-            printToSystemd(type(line), line)#[0], line[1], line[2], line[3], line[4])'''
+    temp = millis()
+    response = None
+    if waitResponse:
+        while millis() - temp < 2000:
+            if ser.in_waiting > 0:
+                response = ser.read(5)
+                #printToSystemd(type(response), response, response[0], response[1], response[2], response[3], response[4])
     ser.close()
     GPIO.output(UART_PIN, 1)
+    return response
+
+def sendToArduino(fade, brightness, mode, color=[], waitResponse=False): #brightness, mode, [r, g, b]):
+    return sendToArduinoRaw([fade, brightness, mode] + color, waitResponse)
 
 async def arduino(queue: asyncio.Queue):
     while True:
         number = await queue.get()
         if number == 5: # white
-            sendToArduino([51, 5])
+            sendToArduino(1, 51, 5)
         elif number == 6: # RGB
-            sendToArduino([51, 11])
+            sendToArduino(1, 51, 11)
         elif number == 7: # pink
-            sendToArduino([85, 16, 255, 105, 180])
+            sendToArduino(1, 85, 16, [255, 105, 180])
         queue.task_done()
         await asyncio.sleep(0.1)
 
@@ -168,20 +176,22 @@ async def arduino(queue: asyncio.Queue):
 alarmOn = True
 alarmSkip = False
 
-def alarmResponse():
-    if not(alarmOn):
-        sendToArduino([51, 16, 255, 0, 0])
-        time.sleep(2)
-        sendToArduino([51, 11])
+def alarmResponseDisplay(old):
+    print(type(old), old)
+    time.sleep(2)
+    if old is not None:
+        sendToArduinoRaw([0] + [x for x in old])
     else:
-        if alarmSkip:
-            sendToArduino([51, 16, 255, 255, 0])
-            time.sleep(2)
-            sendToArduino([51, 11])
-        else:
-            sendToArduino([51, 16, 0, 255, 0])
-            time.sleep(2)
-            sendToArduino([51, 11])
+        sendToArduino(0, 51, 11)
+
+def alarmResponse():
+    if not(alarmOn): # red
+        alarmResponseDisplay(sendToArduino(1, 51, 16, [255, 0, 0], True))
+    else:
+        if alarmSkip: # yellow
+            alarmResponseDisplay(sendToArduino(1, 51, 16, [255, 255, 0], True))
+        else: # green
+            alarmResponseDisplay(sendToArduino(1, 51, 16, [0, 255, 0], True))
 
 async def alarmToggle(queue: asyncio.Queue):
     global alarmOn, alarmSkip
@@ -203,10 +213,11 @@ async def alarm():
     if alarmOn and not(alarmSkip) and ledStripOn is not None:
         await ledStripOn.command('main', 'switch', 'on')
         await asyncio.sleep(10)
-        sendToArduino([17, 5])
+        sendToArduino(0, 17, 5)
         for brightness in range(17*2, 17*6+1, 17):
             await asyncio.sleep(60*5) # 2
-            sendToArduino([brightness, 5])
+            sendToArduino(0, brightness, 5)
+        await bedsideLampOn.command('main', 'switch', 'on')
     alarmSkip = False
 
 
