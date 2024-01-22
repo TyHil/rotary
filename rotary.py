@@ -209,7 +209,7 @@ async def alarmToggle(queue: asyncio.Queue):
 
 async def alarm():
     global alarmOn, alarmSkip
-    global ledStripOn
+    global ledStripOn, bedsideLampOn
     if alarmOn and not(alarmSkip) and ledStripOn is not None:
         await ledStripOn.command('main', 'switch', 'on')
         await asyncio.sleep(10)
@@ -247,7 +247,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 async def alarmSchedule():
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(alarm, 'cron', year="*", month="*", day="*", hour="10", minute="30") # hour="*", minute="*", second="40")
+    scheduler.add_job(alarm, 'cron', year="*", month="*", day="*", hour="10", minute="29", second="50") # hour="*", minute="*", second="40")
     scheduler.start()
     try:
         while True:
