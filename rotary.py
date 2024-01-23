@@ -62,7 +62,7 @@ async def routeNumbers(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
             await outQueues[1].put(number)
         elif number == 7:
             await asyncio.gather(outQueues[0].put(number), outQueues[1].put(number))
-        elif number == 8 or number == 9:
+        elif number == 9:
             await outQueues[2].put(number)
         elif number == 10:
             await outQueues[3].put(number)
@@ -177,12 +177,11 @@ alarmOn = True
 alarmSkip = False
 
 def alarmResponseDisplay(old):
-    print(type(old), old)
     time.sleep(2)
     if old is not None:
-        sendToArduinoRaw([0] + [x for x in old])
+        sendToArduinoRaw([1] + [x for x in old])
     else:
-        sendToArduino(0, 51, 11)
+        sendToArduino(1, 51, 11)
 
 def alarmResponse():
     if not(alarmOn): # red
@@ -197,13 +196,15 @@ async def alarmToggle(queue: asyncio.Queue):
     global alarmOn, alarmSkip
     while True:
         number = await queue.get()
-        if number == 8: # skip toggle
-            alarmSkip = not(alarmSkip)
+        if number == 9: # skip and on/off toggle
+            if not(alarmOn):
+                alarmOn = True
+                alarmSkip = False
+            elif not(alarmSkip):
+                alarmSkip = True
+            elif alarmSkip:
+                alarmOn = False
             alarmResponse()
-        elif number == 9: # on/off toggle
-            alarmOn = not(alarmOn)
-            alarmResponse()
-        print(alarmOn, alarmSkip)
         queue.task_done()
         await asyncio.sleep(0.1)
 
