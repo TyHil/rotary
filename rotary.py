@@ -75,61 +75,62 @@ import aiohttp
 import pysmartthings
 import config # defines smartThingsToken
 
-# for alarm
-ledStripOn = None
-bedsideLampOn = None
+smartThingsRouterQueue = asyncio.Queue()
 
-async def smartThings(queue: asyncio.Queue):
-    global ledStripOn
+async def smartThings():
     while True:
         try:
             printToSystemd('Smart Things connecting...')
             async with aiohttp.ClientSession() as session:
-                ledStrip = {}
-                bedsideLamp = {}
-                allDevices = {}
+                devices = {}
 
                 api = pysmartthings.SmartThings(session, config.smartThingsToken)
                 for device in await api.devices(): #categorize devices
                     if device.label == 'LED Strip On':
-                        ledStrip['on'] = device
-                        ledStripOn = device
+                        devices['ledStrip']['on'] = device
                     elif device.label == 'LED Strip Off':
-                        ledStrip['off'] = device
+                        devices['ledStrip']['off'] = device
                     elif device.label == 'LED Strip Toggle':
-                        ledStrip['toggle'] = device
+                        devices['ledStrip']['toggle'] = device
                     elif device.label == 'Bedside Lamp On':
-                        bedsideLamp['on'] = device
-                        bedsideLampOn = device
+                        devices['bedsideLamp']['on'] = device
                     elif device.label == 'Bedside Lamp Off':
-                        bedsideLamp['off'] = device
+                        devices['bedsideLamp']['off'] = device
                     elif device.label == 'Bedside Lamp Toggle':
-                        bedsideLamp['toggle'] = device
+                        devices['bedsideLamp']['toggle'] = device
                     elif device.label == 'All On':
-                        allDevices['on'] = device
+                        devices['allDevices']['on'] = device
                     elif device.label == 'All Off':
-                        allDevices['off'] = device
+                        devices['allDevices']['off'] = device
                 printToSystemd('Smart Things connected.')
 
                 while True: #consumer
-                    number = await queue.get()
-                    if number == 1:
-                        await allDevices['on'].command('main', 'switch', 'on')
-                    elif number == 2:
-                        await allDevices['off'].command('main', 'switch', 'on')
-                    elif number == 3:
-                        await bedsideLamp['toggle'].command('main', 'switch', 'on')
-                    elif number == 4:
-                        await ledStrip['toggle'].command('main', 'switch', 'on')
-                    elif number == 7:
-                        await bedsideLamp['off'].command('main', 'switch', 'on')
-                    queue.task_done()
+                    device, command = await smartThingsRouterQueue.get()
+                    if device in devices and command in devices[device]:
+                        await devices[device][command].command('main', 'switch', 'on')
+                    smartThingsRouterQueue.task_done()
                     await asyncio.sleep(0.1)
         except aiohttp.client_exceptions.ClientConnectorError:
             printToSystemd('Smart Things disconnected.')
             await asyncio.sleep(1)
         except:
             break
+
+async def smartThingsRouter(inQueue: asyncio.Queue):
+    while True:
+        number = await inQueue.get()
+        if number == 1:
+            await smartThingsRouterQueue.put(['allDevices', 'on'])
+        elif number == 2:
+            await smartThingsRouterQueue.put(['allDevices', 'off'])
+        elif number == 3:
+            await smartThingsRouterQueue.put(['bedsideLamp', 'toggle'])
+        elif number == 4:
+            await smartThingsRouterQueue.put(['ledStrip', 'toggle'])
+        elif number == 7:
+            await smartThingsRouterQueue.put(['bedsideLamp', 'off'])
+        inQueue.task_done()
+        await asyncio.sleep(0.1)
 
 
 
@@ -218,9 +219,9 @@ async def alarm():
     if day == 0 or day == 1 or day == 2 or day == 3:
         global alarmOn, alarmSkip, alarmStop
         alarmStop = False
-        #global ledStripOn, bedsideLampOn
         if alarmOn and not(alarmSkip) and ledStripOn is not None:
-            await ledStripOn.command('main', 'switch', 'on')
+            await smartThingsRouterQueue.put(['ledStrip', 'on'])
+            await smartThingsRouterQueue.join()
             await asyncio.sleep(10)
             sendToArduino(0, 17, 5)
             for brightness in range(17*2, 17*7+1, 17):
@@ -229,7 +230,7 @@ async def alarm():
                 await asyncio.sleep(60*5) # 2
                 sendToArduino(0, brightness, 5)
             if not(alarmStop):
-                await bedsideLampOn.command('main', 'switch', 'on')
+                await smartThingsRouterQueue.put(['bedsideLampOn', 'on'])
         alarmSkip = False
 
 
@@ -249,9 +250,9 @@ async def restart(queue: asyncio.Queue):
 async def rotary():
     rotaryQueue, smartThingsQueue, arduinoQueue, alarmToggleQueue, restartQueue = asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue()
     producer = asyncio.create_task(readRotary(rotaryQueue))
-    router = asyncio.create_task(routeNumbers(rotaryQueue, [smartThingsQueue, arduinoQueue, alarmToggleQueue, restartQueue]))
-    consumers = [asyncio.create_task(smartThings(smartThingsQueue)), asyncio.create_task(arduino(arduinoQueue)), asyncio.create_task(alarmToggle(alarmToggleQueue)), asyncio.create_task(restart(restartQueue))]
-    await asyncio.gather(producer, router, *consumers)
+    routers = [asyncio.create_task(routeNumbers(rotaryQueue, [smartThingsQueue, arduinoQueue, alarmToggleQueue, restartQueue])), asyncio.create_task(smartThingsRouter(smartThingsQueue))]
+    consumers = [asyncio.create_task(smartThings()), asyncio.create_task(arduino(arduinoQueue)), asyncio.create_task(alarmToggle(alarmToggleQueue)), asyncio.create_task(restart(restartQueue))]
+    await asyncio.gather(producer, *routers, *consumers)
 
 
 
