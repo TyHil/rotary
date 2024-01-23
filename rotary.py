@@ -208,18 +208,22 @@ async def alarmToggle(queue: asyncio.Queue):
         queue.task_done()
         await asyncio.sleep(0.1)
 
+from datetime import date
+
 async def alarm():
-    global alarmOn, alarmSkip
-    global ledStripOn, bedsideLampOn
-    if alarmOn and not(alarmSkip) and ledStripOn is not None:
-        await ledStripOn.command('main', 'switch', 'on')
-        await asyncio.sleep(10)
-        sendToArduino(0, 17, 5)
-        for brightness in range(17*2, 17*6+1, 17):
-            await asyncio.sleep(60*5) # 2
-            sendToArduino(0, brightness, 5)
-        await bedsideLampOn.command('main', 'switch', 'on')
-    alarmSkip = False
+    day = date.today().weekday()
+    if day == 0 or day == 1 or day == 2 or day == 3:
+        global alarmOn, alarmSkip
+        global ledStripOn, bedsideLampOn
+        if alarmOn and not(alarmSkip) and ledStripOn is not None:
+            await ledStripOn.command('main', 'switch', 'on')
+            await asyncio.sleep(10)
+            sendToArduino(0, 17, 5)
+            for brightness in range(17*2, 17*6+1, 17):
+                await asyncio.sleep(60*5) # 2
+                sendToArduino(0, brightness, 5)
+            await bedsideLampOn.command('main', 'switch', 'on')
+        alarmSkip = False
 
 
 
@@ -248,7 +252,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 async def alarmSchedule():
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(alarm, 'cron', year="*", month="*", day="*", hour="10", minute="29", second="50") # hour="*", minute="*", second="40")
+    scheduler.add_job(alarm, 'cron', year="*", month="*", day="*", hour="10", minute="29", second="50") # hour="10", minute="29", second="40")
     scheduler.start()
     try:
         while True:
