@@ -62,7 +62,7 @@ async def routeNumbers(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
             await outQueues[1].put(number)
         elif number == 7:
             await asyncio.gather(outQueues[0].put(number), outQueues[1].put(number))
-        elif number == 9:
+        elif number == 2 or number == 9:
             await outQueues[2].put(number)
         elif number == 10:
             await outQueues[3].put(number)
@@ -175,6 +175,7 @@ async def arduino(queue: asyncio.Queue):
 
 alarmOn = True
 alarmSkip = False
+alarmStop = False
 
 def alarmResponseDisplay(old):
     time.sleep(2)
@@ -193,9 +194,11 @@ def alarmResponse():
             alarmResponseDisplay(sendToArduino(1, 51, 16, [0, 255, 0], True))
 
 async def alarmToggle(queue: asyncio.Queue):
-    global alarmOn, alarmSkip
+    global alarmOn, alarmSkip, alarmStop
     while True:
         number = await queue.get()
+        if number == 2:
+            alarmStop = True
         if number == 9: # skip and on/off toggle
             if not(alarmOn):
                 alarmOn = True
@@ -213,16 +216,20 @@ from datetime import date
 async def alarm():
     day = date.today().weekday()
     if day == 0 or day == 1 or day == 2 or day == 3:
-        global alarmOn, alarmSkip
+        global alarmOn, alarmSkip, alarmStop
+        alarmStop = False
         #global ledStripOn, bedsideLampOn
         if alarmOn and not(alarmSkip) and ledStripOn is not None:
             await ledStripOn.command('main', 'switch', 'on')
             await asyncio.sleep(10)
             sendToArduino(0, 17, 5)
             for brightness in range(17*2, 17*7+1, 17):
+                if alarmStop:
+                    break
                 await asyncio.sleep(60*5) # 2
                 sendToArduino(0, brightness, 5)
-            await bedsideLampOn.command('main', 'switch', 'on')
+            if not(alarmStop):
+                await bedsideLampOn.command('main', 'switch', 'on')
         alarmSkip = False
 
 
