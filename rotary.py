@@ -51,6 +51,9 @@ async def readRotary(queue: asyncio.Queue):
         lastState = buttonState
         await asyncio.sleep(0.01)
 
+import atexit
+atexit.register(GPIO.cleanup)
+
 
 
 async def routeNumbers(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
@@ -275,3 +278,4 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+
