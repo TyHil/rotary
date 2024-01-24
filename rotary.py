@@ -57,18 +57,22 @@ atexit.register(GPIO.cleanup)
 
 
 async def routeNumbers(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
+    def put(index, number):
+        return outQueues[index].put(number)
     while True:
         number = await inQueue.get()
-        if number == 1 or number == 2 or number == 3 or number == 4:
-            await outQueues[0].put(number)
-        elif number == 5 or number == 6:
-            await outQueues[1].put(number)
-        elif number == 7:
-            await asyncio.gather(outQueues[0].put(number), outQueues[1].put(number))
-        elif number == 2 or number == 9:
-            await outQueues[2].put(number)
-        elif number == 10:
-            await outQueues[3].put(number)
+        routes = []
+        if number == 1 or number == 2 or number == 3 or number == 4 or number == 7:
+            routes.append(0)
+        if number == 5 or number == 6 or number == 7:
+            routes.append(1)
+        if number == 2 or number == 9:
+            routes.append(2)
+        if number == 10:
+            routes.append(3)
+        if len(routes) == 0:
+            printToSystemd("Can't route " + str(number))
+        await asyncio.gather(*map(lambda index: outQueues[index].put(number), routes))
         inQueue.task_done()
         await asyncio.sleep(0.1)
 
@@ -112,6 +116,8 @@ async def smartThings(queue: asyncio.Queue):
                     device, command = await queue.get()
                     if device in devices and command in devices[device]:
                         await devices[device][command].command('main', 'switch', 'on')
+                    else:
+                        printToSystemd('Invalid device/command: ' + device + ' ' + command)
                     queue.task_done()
                     await asyncio.sleep(0.1)
         except aiohttp.client_exceptions.ClientConnectorError:
@@ -133,6 +139,7 @@ async def smartThingsRouter(inQueue: asyncio.Queue, outQueue: asyncio.Queue):
             await outQueue.put(['ledStrip', 'toggle'])
         elif number == 7:
             await outQueue.put(['bedsideLamp', 'off'])
+        printToSystemd('No smart things action for ' + str(number))
         inQueue.task_done()
         await asyncio.sleep(0.1)
 
@@ -144,7 +151,7 @@ UART_PIN = 7
 GPIO.setup(UART_PIN, GPIO.OUT)
 GPIO.output(UART_PIN, 1)
 
-def sendToArduinoRaw(data, waitResponse=False): #brightness, mode, [r, g, b]
+def sendToArduinoRaw(data, waitResponse=False):
     GPIO.output(UART_PIN, 0)
     ser = serial.Serial('/dev/ttyS0', 9600, timeout=1)
     ser.reset_input_buffer()
@@ -160,7 +167,7 @@ def sendToArduinoRaw(data, waitResponse=False): #brightness, mode, [r, g, b]
     GPIO.output(UART_PIN, 1)
     return response
 
-def sendToArduino(fade, brightness, mode, color=[], waitResponse=False): #brightness, mode, [r, g, b]):
+def sendToArduino(fade, brightness, mode, color=[], waitResponse=False):
     return sendToArduinoRaw([fade, brightness, mode] + color, waitResponse)
 
 async def arduino(queue: asyncio.Queue):
@@ -172,6 +179,8 @@ async def arduino(queue: asyncio.Queue):
             sendToArduino(1, 51, 11)
         elif number == 7: # pink
             sendToArduino(1, 85, 16, [255, 105, 180])
+        else:
+            printToSystemd('No arduino action for ' + str(number))
         queue.task_done()
         await asyncio.sleep(0.1)
 
@@ -213,6 +222,8 @@ async def alarmToggle(queue: asyncio.Queue):
             elif alarmSkip:
                 alarmOn = False
             alarmResponse()
+        else:
+            printToSystemd('No alarm action for ' + str(number))
         queue.task_done()
         await asyncio.sleep(0.1)
 
@@ -231,7 +242,7 @@ async def alarm(smartThingsQueue: asyncio.Queue):
             for brightness in range(17*2, 17*7+1, 17):
                 if alarmStop:
                     break
-                await asyncio.sleep(2) # 60*5
+                await asyncio.sleep(60*5) # 60*5
                 sendToArduino(0, brightness, 5)
             if not(alarmStop):
                 await smartThingsQueue.put(['bedsideLamp', 'on'])
@@ -246,6 +257,8 @@ async def restart(queue: asyncio.Queue):
         number = await queue.get()
         if number == 10:
             os.execl(sys.executable, sys.executable, *sys.argv)
+        else:
+            printToSystemd('No restart action for ' + str(number))
         queue.task_done()
         await asyncio.sleep(0.1)
 
@@ -265,7 +278,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 async def alarmSchedule(smartThingsQueue: asyncio.Queue()):
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", hour="*", minute="*", second="50") # hour="10", minute="29", second="40")
+    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", hour="10", minute="29", second="50") # hour="10", minute="29", second="40")
     scheduler.start()
     try:
         while True:
