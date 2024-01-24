@@ -78,14 +78,15 @@ import aiohttp
 import pysmartthings
 import config # defines smartThingsToken
 
-smartThingsRouterQueue = asyncio.Queue()
-
-async def smartThings():
+async def smartThings(queue: asyncio.Queue):
     while True:
         try:
             printToSystemd('Smart Things connecting...')
             async with aiohttp.ClientSession() as session:
                 devices = {}
+                devices['ledStrip'] = {}
+                devices['bedsideLamp'] = {}
+                devices['all'] = {}
 
                 api = pysmartthings.SmartThings(session, config.smartThingsToken)
                 for device in await api.devices(): #categorize devices
@@ -102,16 +103,16 @@ async def smartThings():
                     elif device.label == 'Bedside Lamp Toggle':
                         devices['bedsideLamp']['toggle'] = device
                     elif device.label == 'All On':
-                        devices['allDevices']['on'] = device
+                        devices['all']['on'] = device
                     elif device.label == 'All Off':
-                        devices['allDevices']['off'] = device
+                        devices['all']['off'] = device
                 printToSystemd('Smart Things connected.')
 
                 while True: #consumer
-                    device, command = await smartThingsRouterQueue.get()
+                    device, command = await queue.get()
                     if device in devices and command in devices[device]:
                         await devices[device][command].command('main', 'switch', 'on')
-                    smartThingsRouterQueue.task_done()
+                    queue.task_done()
                     await asyncio.sleep(0.1)
         except aiohttp.client_exceptions.ClientConnectorError:
             printToSystemd('Smart Things disconnected.')
@@ -119,19 +120,19 @@ async def smartThings():
         except:
             break
 
-async def smartThingsRouter(inQueue: asyncio.Queue):
+async def smartThingsRouter(inQueue: asyncio.Queue, outQueue: asyncio.Queue):
     while True:
         number = await inQueue.get()
         if number == 1:
-            await smartThingsRouterQueue.put(['allDevices', 'on'])
+            await outQueue.put(['all', 'on'])
         elif number == 2:
-            await smartThingsRouterQueue.put(['allDevices', 'off'])
+            await outQueue.put(['all', 'off'])
         elif number == 3:
-            await smartThingsRouterQueue.put(['bedsideLamp', 'toggle'])
+            await outQueue.put(['bedsideLamp', 'toggle'])
         elif number == 4:
-            await smartThingsRouterQueue.put(['ledStrip', 'toggle'])
+            await outQueue.put(['ledStrip', 'toggle'])
         elif number == 7:
-            await smartThingsRouterQueue.put(['bedsideLamp', 'off'])
+            await outQueue.put(['bedsideLamp', 'off'])
         inQueue.task_done()
         await asyncio.sleep(0.1)
 
@@ -217,23 +218,23 @@ async def alarmToggle(queue: asyncio.Queue):
 
 from datetime import date
 
-async def alarm():
+async def alarm(smartThingsQueue: asyncio.Queue):
     day = date.today().weekday()
     if day == 0 or day == 1 or day == 2 or day == 3:
         global alarmOn, alarmSkip, alarmStop
         alarmStop = False
-        if alarmOn and not(alarmSkip) and ledStripOn is not None:
-            await smartThingsRouterQueue.put(['ledStrip', 'on'])
-            await smartThingsRouterQueue.join()
+        if alarmOn and not(alarmSkip):
+            await smartThingsQueue.put(['ledStrip', 'on'])
+            await smartThingsQueue.join()
             await asyncio.sleep(10)
             sendToArduino(0, 17, 5)
             for brightness in range(17*2, 17*7+1, 17):
                 if alarmStop:
                     break
-                await asyncio.sleep(60*5) # 2
+                await asyncio.sleep(2) # 60*5
                 sendToArduino(0, brightness, 5)
             if not(alarmStop):
-                await smartThingsRouterQueue.put(['bedsideLampOn', 'on'])
+                await smartThingsQueue.put(['bedsideLamp', 'on'])
         alarmSkip = False
 
 
@@ -250,20 +251,21 @@ async def restart(queue: asyncio.Queue):
 
 
 
-async def rotary():
-    rotaryQueue, smartThingsQueue, arduinoQueue, alarmToggleQueue, restartQueue = asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue()
+async def rotary(smartThingsQueue: asyncio.Queue):
+    rotaryQueue = asyncio.Queue()
+    smartThingsRouterQueue, arduinoQueue, alarmToggleQueue, restartQueue = asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue()
     producer = asyncio.create_task(readRotary(rotaryQueue))
-    routers = [asyncio.create_task(routeNumbers(rotaryQueue, [smartThingsQueue, arduinoQueue, alarmToggleQueue, restartQueue])), asyncio.create_task(smartThingsRouter(smartThingsQueue))]
-    consumers = [asyncio.create_task(smartThings()), asyncio.create_task(arduino(arduinoQueue)), asyncio.create_task(alarmToggle(alarmToggleQueue)), asyncio.create_task(restart(restartQueue))]
+    routers = [asyncio.create_task(routeNumbers(rotaryQueue, [smartThingsRouterQueue, arduinoQueue, alarmToggleQueue, restartQueue])), asyncio.create_task(smartThingsRouter(smartThingsRouterQueue, smartThingsQueue))]
+    consumers = [asyncio.create_task(smartThings(smartThingsQueue)), asyncio.create_task(arduino(arduinoQueue)), asyncio.create_task(alarmToggle(alarmToggleQueue)), asyncio.create_task(restart(restartQueue))]
     await asyncio.gather(producer, *routers, *consumers)
 
 
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-async def alarmSchedule():
+async def alarmSchedule(smartThingsQueue: asyncio.Queue()):
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(alarm, 'cron', year="*", month="*", day="*", hour="10", minute="29", second="50") # hour="10", minute="29", second="40")
+    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", hour="*", minute="*", second="50") # hour="10", minute="29", second="40")
     scheduler.start()
     try:
         while True:
@@ -274,7 +276,8 @@ async def alarmSchedule():
 
 
 async def main():
-    await asyncio.gather(rotary(), alarmSchedule())
+    smartThingsQueue = asyncio.Queue()
+    await asyncio.gather(rotary(smartThingsQueue), alarmSchedule(smartThingsQueue))
 
 if __name__ == '__main__':
     asyncio.run(main())
