@@ -212,7 +212,7 @@ async def alarmToggle(queue: asyncio.Queue):
         number = await queue.get()
         if number == 2:
             alarmStop = True
-        if number == 9: # skip and on/off toggle
+        elif number == 9: # skip and on/off toggle
             if not(alarmOn):
                 alarmOn = True
                 alarmSkip = False
