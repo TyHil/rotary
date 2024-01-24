@@ -35,7 +35,7 @@ async def readRotary(queue: asyncio.Queue):
         buttonState = GPIO.input(ROTARY_PIN)
 
         if (millis() - lastStateChangeTime) > dialHasFinishedRotatingAfterMs and needToPrint:
-            printToSystemd(count)
+            printToSystemd('Read ' + str(count))
             await queue.put(count)
             needToPrint = 0
             count = 0
@@ -57,8 +57,6 @@ atexit.register(GPIO.cleanup)
 
 
 async def routeNumbers(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
-    def put(index, number):
-        return outQueues[index].put(number)
     while True:
         number = await inQueue.get()
         routes = []
@@ -139,7 +137,8 @@ async def smartThingsRouter(inQueue: asyncio.Queue, outQueue: asyncio.Queue):
             await outQueue.put(['ledStrip', 'toggle'])
         elif number == 7:
             await outQueue.put(['bedsideLamp', 'off'])
-        printToSystemd('No smart things action for ' + str(number))
+        else:
+            printToSystemd('No smart things action for ' + str(number))
         inQueue.task_done()
         await asyncio.sleep(0.1)
 
