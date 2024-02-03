@@ -229,22 +229,24 @@ async def alarmToggle(queue: asyncio.Queue):
 from datetime import date
 
 async def alarm(smartThingsQueue: asyncio.Queue):
+    global alarmOn, alarmSkip, alarmStop
+    alarmStop = False
+    if alarmOn and not(alarmSkip):
+        await smartThingsQueue.put(['ledStrip', 'on'])
+        await smartThingsQueue.join()
+        await asyncio.sleep(10)
+        sendToArduino(0, 17, 5)
+        for brightness in range(17*2, 17*7+1, 17):
+            if alarmStop:
+                break
+            await asyncio.sleep(60*5) # 60*5
+            sendToArduino(0, brightness, 5)
+        if not(alarmStop):
+            await smartThingsQueue.put(['bedsideLamp', 'on'])
     day = date.today().weekday()
-    if day == 0 or day == 1 or day == 2 or day == 3:
-        global alarmOn, alarmSkip, alarmStop
-        alarmStop = False
-        if alarmOn and not(alarmSkip):
-            await smartThingsQueue.put(['ledStrip', 'on'])
-            await smartThingsQueue.join()
-            await asyncio.sleep(10)
-            sendToArduino(0, 17, 5)
-            for brightness in range(17*2, 17*7+1, 17):
-                if alarmStop:
-                    break
-                await asyncio.sleep(60*5) # 60*5
-                sendToArduino(0, brightness, 5)
-            if not(alarmStop):
-                await smartThingsQueue.put(['bedsideLamp', 'on'])
+    if day == 4 or day == 5 or day == 6:
+        alarmSkip = True
+    else:
         alarmSkip = False
 
 
