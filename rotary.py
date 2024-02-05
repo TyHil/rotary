@@ -173,11 +173,11 @@ async def arduino(queue: asyncio.Queue):
     while True:
         number = await queue.get()
         if number == 5: # white
-            sendToArduino(1, 51, 5)
+            sendToArduino(1, 51, 0)
         elif number == 6: # RGB
-            sendToArduino(1, 51, 11)
+            sendToArduino(1, 51, 1)
         elif number == 7: # pink
-            sendToArduino(1, 85, 16, [255, 105, 180])
+            sendToArduino(1, 85, 6, [255, 105, 180])
         else:
             printToSystemd('No arduino action for ' + str(number))
         queue.task_done()
@@ -195,16 +195,16 @@ def alarmResponseDisplay(old):
     if old is not None:
         sendToArduinoRaw([1] + [x for x in old])
     else:
-        sendToArduino(1, 51, 11)
+        sendToArduino(1, 51, 1)
 
 def alarmResponse():
     if not(alarmOn): # red
-        alarmResponseDisplay(sendToArduino(1, 51, 16, [255, 0, 0], True))
+        alarmResponseDisplay(sendToArduino(1, 51, 6, [255, 0, 0], True))
     else:
         if alarmSkip: # yellow
-            alarmResponseDisplay(sendToArduino(1, 51, 16, [255, 255, 0], True))
+            alarmResponseDisplay(sendToArduino(1, 51, 6, [255, 255, 0], True))
         else: # green
-            alarmResponseDisplay(sendToArduino(1, 51, 16, [0, 255, 0], True))
+            alarmResponseDisplay(sendToArduino(1, 51, 6, [0, 255, 0], True))
 
 async def alarmToggle(queue: asyncio.Queue):
     global alarmOn, alarmSkip, alarmStop
@@ -235,12 +235,12 @@ async def alarm(smartThingsQueue: asyncio.Queue):
         await smartThingsQueue.put(['ledStrip', 'on'])
         await smartThingsQueue.join()
         await asyncio.sleep(10)
-        sendToArduino(0, 17, 5)
+        sendToArduino(0, 17, 0)
         for brightness in range(17*2, 17*7+1, 17):
             if alarmStop:
                 break
             await asyncio.sleep(60*5) # 60*5
-            sendToArduino(0, brightness, 5)
+            sendToArduino(0, brightness, 0)
         if not(alarmStop):
             await smartThingsQueue.put(['bedsideLamp', 'on'])
     day = date.today().weekday()
