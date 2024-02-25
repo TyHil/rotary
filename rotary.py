@@ -60,10 +60,10 @@ async def ainput() -> str:
     return await asyncio.to_thread(sys.stdin.readline)
 
 async def readInput(queue: asyncio.Queue):
-    while True:
+    '''while True:
         number = int(await ainput())
         await queue.put(number)
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.1)'''
 
 
 
