@@ -56,6 +56,17 @@ atexit.register(GPIO.cleanup)
 
 
 
+async def ainput() -> str:
+    return await asyncio.to_thread(sys.stdin.readline)
+
+async def readInput(queue: asyncio.Queue):
+    while True:
+        number = int(await ainput())
+        await queue.put(number)
+        await asyncio.sleep(0.1)
+
+
+
 async def routeNumbers(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
     while True:
         number = await inQueue.get()
@@ -263,12 +274,12 @@ async def restart(queue: asyncio.Queue):
 
 
 async def rotary(smartThingsQueue: asyncio.Queue):
-    rotaryQueue = asyncio.Queue()
+    numberQueue = asyncio.Queue()
     smartThingsRouterQueue, arduinoQueue, alarmToggleQueue, restartQueue = asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue()
-    producer = asyncio.create_task(readRotary(rotaryQueue))
-    routers = [asyncio.create_task(routeNumbers(rotaryQueue, [smartThingsRouterQueue, arduinoQueue, alarmToggleQueue, restartQueue])), asyncio.create_task(smartThingsRouter(smartThingsRouterQueue, smartThingsQueue))]
+    producers = [asyncio.create_task(readRotary(numberQueue)), asyncio.create_task(readInput(numberQueue))]
+    routers = [asyncio.create_task(routeNumbers(numberQueue, [smartThingsRouterQueue, arduinoQueue, alarmToggleQueue, restartQueue])), asyncio.create_task(smartThingsRouter(smartThingsRouterQueue, smartThingsQueue))]
     consumers = [asyncio.create_task(smartThings(smartThingsQueue)), asyncio.create_task(arduino(arduinoQueue)), asyncio.create_task(alarmToggle(alarmToggleQueue)), asyncio.create_task(restart(restartQueue))]
-    await asyncio.gather(producer, *routers, *consumers)
+    await asyncio.gather(*producers, *routers, *consumers)
 
 
 
