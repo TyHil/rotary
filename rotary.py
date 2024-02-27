@@ -57,14 +57,15 @@ atexit.register(GPIO.cleanup)
 
 
 async def readInput(queue: asyncio.Queue):
-    while True:
-        input = await asyncio.to_thread(sys.stdin.readline)
-        try:
-            number = int(input)
-            await queue.put(number)
-        except ValueError:
-            continue
-        await asyncio.sleep(0.1)
+    if '--headless' not in sys.argv[1:]:
+        while True:
+            input = await asyncio.to_thread(sys.stdin.readline)
+            try:
+                number = int(input)
+                await queue.put(number)
+            except ValueError:
+                continue
+            await asyncio.sleep(0.1)
 
 
 
