@@ -239,8 +239,8 @@ async def alarmToggle(queue: asyncio.Queue):
 from datetime import date
 
 async def alarm(smartThingsQueue: asyncio.Queue):
+    global alarmState, alarmStopEarly
     if alarmState != AlarmState.off:
-        global alarmState, alarmStopEarly
         alarmStopEarly = False
         if alarmState == AlarmState.on:
             await smartThingsQueue.put(['ledStrip', 'on'])
