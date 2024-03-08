@@ -239,25 +239,26 @@ async def alarmToggle(queue: asyncio.Queue):
 from datetime import date
 
 async def alarm(smartThingsQueue: asyncio.Queue):
-    global alarmState, alarmStopEarly
-    alarmStopEarly = False
-    if alarmState == AlarmState.on:
-        await smartThingsQueue.put(['ledStrip', 'on'])
-        await smartThingsQueue.join()
-        await asyncio.sleep(10)
-        sendToArduino(0, 17, 0)
-        for brightness in range(17*2, 17*7+1, 17):
-            if alarmStopEarly:
-                break
-            await asyncio.sleep(60*5) # 60*5
-            sendToArduino(0, brightness, 0)
-        if not(alarmStopEarly):
-            await smartThingsQueue.put(['bedsideLamp', 'on'])
-    day = date.today().weekday()
-    if day == 4 or day == 5 or day == 6:
-        alarmState = AlarmState.skip
-    else:
-        alarmState = AlarmState.on
+    if alarmState != AlarmState.off:
+        global alarmState, alarmStopEarly
+        alarmStopEarly = False
+        if alarmState == AlarmState.on:
+            await smartThingsQueue.put(['ledStrip', 'on'])
+            await smartThingsQueue.join()
+            await asyncio.sleep(10)
+            sendToArduino(0, 17, 0)
+            for brightness in range(17*2, 17*7+1, 17):
+                if alarmStopEarly:
+                    break
+                await asyncio.sleep(60*5) # 60*5
+                sendToArduino(0, brightness, 0)
+            if not(alarmStopEarly):
+                await smartThingsQueue.put(['bedsideLamp', 'on'])
+        day = date.today().weekday()
+        if day == 3 or day == 4 or day == 5:
+            alarmState = AlarmState.skip
+        else:
+            alarmState = AlarmState.on
 
 
 
