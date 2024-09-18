@@ -290,7 +290,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 async def alarmSchedule(smartThingsQueue: asyncio.Queue()):
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", hour="10", minute="29", second="50") # hour="10", minute="29", second="40")
+    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", hour="9", minute="29", second="50") # hour="10", minute="29", second="40")
     scheduler.start()
     try:
         while True:
