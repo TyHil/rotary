@@ -254,10 +254,7 @@ async def alarm(smartThingsQueue: asyncio.Queue):
                 sendToArduino(0, brightness, 0)
             if not(alarmStopEarly):
                 await smartThingsQueue.put(['bedsideLamp', 'on'])
-        day = date.today().weekday()
-        if day == 3 or day == 4 or day == 5:
-            alarmState = AlarmState.skip
-        else:
+        if alarmState == AlarmState.skip:
             alarmState = AlarmState.on
 
 
@@ -290,7 +287,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 async def alarmSchedule(smartThingsQueue: asyncio.Queue()):
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", hour="9", minute="29", second="50") # hour="10", minute="29", second="40")
+    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="mon", hour="10", minute="59", second="50")
+    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="tue", hour="9", minute="29", second="50")
+    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="wed", hour="10", minute="59", second="50")
+    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="thu", hour="9", minute="29", second="50")
     scheduler.start()
     try:
         while True:
@@ -306,4 +306,6 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+
+
 
