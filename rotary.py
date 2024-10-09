@@ -60,6 +60,11 @@ async def readInput(queue: asyncio.Queue):
     if '--headless' not in sys.argv[1:]:
         while True:
             input = await asyncio.to_thread(sys.stdin.readline)
+            if input == "exit\n":
+                for task in asyncio.all_tasks():
+                    if task is not asyncio.current_task():
+                        task.cancel()
+                break
             try:
                 number = int(input)
                 await queue.put(number)
@@ -295,14 +300,17 @@ async def alarmSchedule(smartThingsQueue: asyncio.Queue()):
     try:
         while True:
             await asyncio.sleep(1)
-    except (KeyboardInterrupt, SystemExit):
+    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
 
 
 
 async def main():
     smartThingsQueue = asyncio.Queue()
-    await asyncio.gather(rotary(smartThingsQueue), alarmSchedule(smartThingsQueue))
+    try:
+        await asyncio.gather(rotary(smartThingsQueue), alarmSchedule(smartThingsQueue))
+    except asyncio.CancelledError:
+        pass
 
 if __name__ == '__main__':
     asyncio.run(main())
