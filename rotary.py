@@ -251,7 +251,7 @@ async def alarm(smartThingsQueue: asyncio.Queue):
             await smartThingsQueue.put(['ledStrip', 'on'])
             await smartThingsQueue.join()
             await asyncio.sleep(10)
-            sendToArduino(0, 17, 0)
+            sendToArduino(0, 5, 0)
             for brightness in range(17*2, 17*7+1, 17):
                 if alarmStopEarly:
                     break
@@ -296,6 +296,7 @@ async def alarmSchedule(smartThingsQueue: asyncio.Queue()):
     scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="tue", hour="9", minute="29", second="50")
     scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="wed", hour="10", minute="59", second="50")
     scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="thu", hour="9", minute="29", second="50")
+    #scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="*", hour="*", minute="*", second="0")
     scheduler.start()
     try:
         while True:
