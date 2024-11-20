@@ -60,7 +60,7 @@ async def readInput(queue: asyncio.Queue):
     if '--headless' not in sys.argv[1:]:
         while True:
             input = await asyncio.to_thread(sys.stdin.readline)
-            if input == "exit\n":
+            if input == "exit\n" or input == "q\n":
                 for task in asyncio.all_tasks():
                     if task is not asyncio.current_task():
                         task.cancel()
@@ -168,24 +168,35 @@ UART_PIN = 7
 GPIO.setup(UART_PIN, GPIO.OUT)
 GPIO.output(UART_PIN, 1)
 
-def sendToArduinoRaw(data, waitResponse=False):
+def sendToArduinoRaw(data):
     GPIO.output(UART_PIN, 0)
     ser = serial.Serial('/dev/ttyS0', 9600, timeout=1)
     ser.reset_input_buffer()
-    ser.write(bytes(data))
+    ser.write(bytes(data + [sum(data) % 256]))
     temp = millis()
+    while millis() - temp < 2000:
+        pass
     response = None
-    if waitResponse:
-        while millis() - temp < 2000:
-            if ser.in_waiting > 0:
-                response = ser.read(5)
-                #printToSystemd(type(response), response, response[0], response[1], response[2], response[3], response[4])
+    if ser.in_waiting > 0:
+        check = ser.read()
+        if check == b'\x00':
+            ser.close()
+            GPIO.output(UART_PIN, 1)
+            temp = millis()
+            while millis() - temp < 2000:
+                pass
+            return sendToArduinoRaw(data)
+        else:
+            response = ser.read(5)
+            #printToSystemd(type(response), response, response[0], response[1], response[2], response[3], response[4])
+    else:
+        print('Failed to send to Arduino')
     ser.close()
     GPIO.output(UART_PIN, 1)
     return response
 
-def sendToArduino(fade, brightness, mode, color=[], waitResponse=False):
-    return sendToArduinoRaw([fade, brightness, mode] + color, waitResponse)
+def sendToArduino(fade, brightness, mode, color=[]):
+    return sendToArduinoRaw([fade, brightness, mode] + color)
 
 async def arduino(queue: asyncio.Queue):
     while True:
@@ -220,7 +231,7 @@ def alarmResponse():
         color = [0, 255, 0] # green
     elif alarmState == AlarmState.skip:
         color = [255, 255, 0] # yellow
-    old = sendToArduino(1, 51, 6, color, True)
+    old = sendToArduino(1, 51, 6, color)
     time.sleep(2)
     if old is not None:
         sendToArduinoRaw([1] + [x for x in old])
