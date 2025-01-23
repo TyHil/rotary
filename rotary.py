@@ -299,15 +299,25 @@ async def rotary(smartThingsQueue: asyncio.Queue):
 
 
 
+import alarms # defines times
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 async def alarmSchedule(smartThingsQueue: asyncio.Queue()):
+    removeMins = 31
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="mon", hour="10", minute="59", second="50")
-    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="tue", hour="9", minute="29", second="50")
-    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="wed", hour="10", minute="59", second="50")
-    scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="thu", hour="9", minute="29", second="50")
-    #scheduler.add_job(alarm, 'cron', [smartThingsQueue], year="*", month="*", day="*", day_of_week="*", hour="*", minute="*", second="0")
+    for time in alarms.times:
+        scheduler.add_job(
+            alarm,
+            'cron',
+            [smartThingsQueue],
+            year='*',
+            month='*',
+            day='*',
+            day_of_week=time['day'],
+            hour=((time['hour'] - 1) % 24) if (time['minute'] < removeMins) else time['hour'],
+            minute=(time['minute'] - removeMins) % 60,
+            second='50'
+        )
     scheduler.start()
     try:
         while True:
