@@ -1,9 +1,8 @@
 times = [
     {
-        'day': 'mon',
-        'hour': 9,
-        'minute': 0,
+        "day": "mon",
+        "hour": 9,
+        "minute": 0,
     },
-    #...
+    # ...
 ]
-
