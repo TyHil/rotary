@@ -1,0 +1,16 @@
+name: Format Check
+
+on: push
+
+jobs:
+  main:
+    name: Run Black
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Run Black
+        uses: psf/black@stable
+
