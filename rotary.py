@@ -10,14 +10,19 @@ GPIO.setmode(GPIO.BOARD)
 import sys
 
 
-def printToSystemd(*objects):
-    print(*objects)
-    sys.stdout.flush()
+# Prints to systemd service status logs
+def printToSystemd(*args, **kwargs):
+    print(*args, **kwargs)
+    if "file" in kwargs:
+        kwargs["file"].flush()
+    else:
+        sys.stdout.flush()
 
 
 import time
 
 
+# For timing async waits
 def millis():
     return time.time_ns() // 1_000_000
 
@@ -65,6 +70,7 @@ atexit.register(GPIO.cleanup)
 # Terminal Input Producer
 
 
+# Manual control and clean exit when testing
 async def readInput(queue: asyncio.Queue):
     if "--headless" not in sys.argv[1:]:
         while True:
@@ -111,9 +117,11 @@ import pysmartthings
 import config  # defines smartThingsToken
 
 
+# Change any SmartThings toggle
 async def smartThings(queue: asyncio.Queue):
     while True:
         try:
+            # setup
             printToSystemd("Smart Things connecting...")
             async with aiohttp.ClientSession() as session:
                 devices = {}
@@ -152,10 +160,12 @@ async def smartThings(queue: asyncio.Queue):
         except aiohttp.client_exceptions.ClientConnectorError:
             printToSystemd("Smart Things disconnected.")
             await asyncio.sleep(1)
-        except:
+        except Exception as e:
+            printToSystemd(e, file=sys.stderr)
             break
 
 
+# Mini router to make toggling separate
 async def smartThingsRouter(inQueue: asyncio.Queue, outQueue: asyncio.Queue):
     while True:
         number = await inQueue.get()
@@ -184,6 +194,7 @@ GPIO.setup(UART_PIN, GPIO.OUT)
 GPIO.output(UART_PIN, 1)
 
 
+# Send any bytes
 def sendToArduinoRaw(data):
     GPIO.output(UART_PIN, 0)
     ser = serial.Serial("/dev/ttyS0", 9600, timeout=1)
@@ -212,10 +223,12 @@ def sendToArduinoRaw(data):
     return response
 
 
+# Use paramaters to send
 def sendToArduino(fade, brightness, mode, color=[]):
     return sendToArduinoRaw([fade, brightness, mode] + color)
 
 
+# Consumer
 async def arduino(queue: asyncio.Queue):
     while True:
         number = await queue.get()
@@ -250,6 +263,7 @@ alarmState = AlarmState.on
 alarmStopEarly = False
 
 
+# Display state on LED Strip
 def alarmResponse():
     color = [255, 0, 0]  # red
     if alarmState == AlarmState.on:
@@ -264,6 +278,7 @@ def alarmResponse():
         sendToArduino(1, 51, 1)
 
 
+# Change alarm state
 async def alarmToggle(queue: asyncio.Queue):
     global alarmState, alarmStopEarly
     while True:
