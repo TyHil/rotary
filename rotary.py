@@ -309,7 +309,7 @@ async def alarm(smartThingsQueue: asyncio.Queue):
             for brightness in range(17 * 2, 17 * 7 + 1, 17):
                 if alarmStopEarly:
                     break
-                await asyncio.sleep(60 * 5)  # 60*5
+                await asyncio.sleep(60 * 5)
                 sendToArduino(0, brightness, 0)
             if not (alarmStopEarly):
                 await smartThingsQueue.put(["bedsideLamp", "on"])
