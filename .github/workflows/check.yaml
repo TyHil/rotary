@@ -1,6 +1,9 @@
 name: Format Check
 
-on: push
+on:
+  push:
+    paths:
+      - "**.py"
 
 jobs:
   main:
@@ -13,4 +16,3 @@ jobs:
 
       - name: Run Black
         uses: psf/black@stable
-
