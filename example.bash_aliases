@@ -12,9 +12,6 @@ function rotary() {
 	elif [ "$1" = "status" ]; then
 		shift
 		systemctl status rotary "$@"
-	elif [ "$1" = "test" ]; then
-		shift
-		python ~/Documents/rotary/rotary/src/main.py "$@"
 	else
 		systemctl status rotary "$@"
 	fi

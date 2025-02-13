@@ -74,14 +74,14 @@ atexit.register(GPIO.cleanup)
 async def readInput(queue: asyncio.Queue):
     if "--headless" not in sys.argv[1:]:
         while True:
-            input = await asyncio.to_thread(sys.stdin.readline)
-            if input == "exit\n" or input == "q\n":
+            line = await asyncio.to_thread(input, "> ")
+            if line == "exit" or line == "q":
                 for task in asyncio.all_tasks():
                     if task is not asyncio.current_task():
                         task.cancel()
                 break
             try:
-                number = int(input)
+                number = int(line)
                 await queue.put(number)
             except ValueError:
                 continue
