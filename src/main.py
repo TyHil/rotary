@@ -99,7 +99,7 @@ async def routeNumbers(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
             routes.append(0)
         if number == 5 or number == 6 or number == 7:
             routes.append(1)
-        if number == 2 or number == 9:
+        if number == 9:
             routes.append(2)
         if number == 10:
             routes.append(3)
@@ -163,17 +163,22 @@ async def smartThings(queue: asyncio.Queue):
 
 # Mini router to make toggling separate
 async def smartThingsRouter(inQueue: asyncio.Queue, outQueue: asyncio.Queue):
+    global alarmStopEarly
     while True:
         number = await inQueue.get()
         if number == 1:
+            alarmStopEarly = True
             await outQueue.put(["all", "on"])
         elif number == 2:
+            alarmStopEarly = True
             await outQueue.put(["all", "off"])
         elif number == 3:
             await outQueue.put(["bedsideLamp", "toggle"])
         elif number == 4:
+            alarmStopEarly = True
             await outQueue.put(["ledStrip", "toggle"])
         elif number == 7:
+            alarmStopEarly = True
             await outQueue.put(["bedsideLamp", "off"])
         else:
             printToSystemd("No SmartThings action for " + str(number))
@@ -226,13 +231,17 @@ def sendToArduino(fade, brightness, mode, color=[]):
 
 # Consumer
 async def arduino(queue: asyncio.Queue):
+    global alarmStopEarly
     while True:
         number = await queue.get()
         if number == 5:  # white
+            alarmStopEarly = True
             sendToArduino(1, 51, 0)
         elif number == 6:  # RGB
+            alarmStopEarly = True
             sendToArduino(1, 51, 1)
         elif number == 7:  # pink
+            alarmStopEarly = True
             sendToArduino(1, 85, 6, [255, 105, 180])
         else:
             printToSystemd("No arduino action for " + str(number))
@@ -279,9 +288,8 @@ async def alarmToggle(queue: asyncio.Queue):
     global alarmState, alarmStopEarly
     while True:
         number = await queue.get()
-        if number == 2:
+        if number == 9:  # skip and on/off toggle
             alarmStopEarly = True
-        elif number == 9:  # skip and on/off toggle
             alarmState = alarmState.next()
             alarmResponse()
         else:
@@ -309,7 +317,7 @@ async def alarm(smartThingsQueue: asyncio.Queue):
                 sendToArduino(0, brightness, 0)
             if not (alarmStopEarly):
                 await smartThingsQueue.put(["bedsideLamp", "on"])
-        if alarmState == AlarmState.skip:
+        elif alarmState == AlarmState.skip:
             alarmState = AlarmState.on
 
 
