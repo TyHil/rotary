@@ -1,28 +1,13 @@
+import sys
 import asyncio
 
 import RPi.GPIO as GPIO
 
 GPIO.setmode(GPIO.BOARD)
 
-
-# Helper Functions
-
-import sys
-
-
-# Prints to systemd service status logs
-def printToSystemd(*args, **kwargs):
-    print(*args, **kwargs)
-    if "file" in kwargs:
-        kwargs["file"].flush()
-    else:
-        sys.stdout.flush()
-
-
 import time
 
-
-# For timing async waits
+# Helper function for timing async waits
 def millis():
     return time.time_ns() // 1_000_000
 
@@ -45,7 +30,7 @@ async def readRotary(queue: asyncio.Queue):
         buttonState = GPIO.input(ROTARY_PIN)
 
         if (millis() - lastStateChangeTime) > dialHasFinishedRotatingAfterMs and needToPrint:
-            printToSystemd("Read " + str(count))
+            print("Read " + str(count), flush=True)
             await queue.put(count)
             needToPrint = 0
             count = 0
@@ -104,7 +89,7 @@ async def routeNumbers(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
         if number == 10:
             routes.append(3)
         if len(routes) == 0:
-            printToSystemd("Can't route " + str(number))
+            print("Can't route " + str(number), flush=True)
         await asyncio.gather(*map(lambda index: outQueues[index].put(number), routes))
         inQueue.task_done()
         await asyncio.sleep(0.1)
@@ -156,7 +141,7 @@ async def smartThings(queue: asyncio.Queue):
                 data='{"commands":[{"component":"main","capability":"switch","command":"on"}]}',
             )
         else:
-            printToSystemd("Invalid device/command: " + device + " " + command)
+            print("Invalid device/command: " + device + " " + command, flush=True)
         queue.task_done()
         await asyncio.sleep(0.1)
 
@@ -180,7 +165,7 @@ async def smartThingsRouter(inQueue: asyncio.Queue, outQueue: asyncio.Queue):
             alarmStopEarly.set()
             await outQueue.put(["bedsideLamp", "off"])
         else:
-            printToSystemd("No SmartThings action for " + str(number))
+            print("No SmartThings action for " + str(number), flush=True)
         inQueue.task_done()
         await asyncio.sleep(0.1)
 
@@ -200,9 +185,7 @@ def sendToArduinoRaw(data):
     ser = serial.Serial("/dev/ttyS0", 9600, timeout=1)
     ser.reset_input_buffer()
     ser.write(bytes(data + [sum(data) % 256]))
-    temp = millis()
-    while millis() - temp < 2000:
-        pass
+    time.sleep(2)
     response = None
     if ser.in_waiting > 0:
         check = ser.read()
@@ -215,9 +198,9 @@ def sendToArduinoRaw(data):
             return sendToArduinoRaw(data)
         else:
             response = ser.read(5)
-            # printToSystemd(type(response), response, response[0], response[1], response[2], response[3], response[4])
+            # print(type(response), response, response[0], response[1], response[2], response[3], response[4], flush=True)
     else:
-        print("Failed to send to Arduino")
+        print("Failed to send to Arduino", flush=True)
     ser.close()
     GPIO.output(UART_PIN, 1)
     return response
@@ -242,7 +225,7 @@ async def arduino(queue: asyncio.Queue):
             alarmStopEarly.set()
             sendToArduino(1, 85, 6, [255, 105, 180])
         else:
-            printToSystemd("No arduino action for " + str(number))
+            print("No arduino action for " + str(number), flush=True)
         queue.task_done()
         await asyncio.sleep(0.1)
 
@@ -291,7 +274,7 @@ async def alarmToggle(queue: asyncio.Queue):
             alarmState = alarmState.next()
             alarmResponse()
         else:
-            printToSystemd("No alarm action for " + str(number))
+            print("No alarm action for " + str(number), flush=True)
         queue.task_done()
         await asyncio.sleep(0.1)
 
@@ -330,7 +313,7 @@ async def restart(queue: asyncio.Queue):
         if number == 10:
             os.execl(sys.executable, sys.executable, *sys.argv)
         else:
-            printToSystemd("No restart action for " + str(number))
+            print("No restart action for " + str(number), flush=True)
         queue.task_done()
         await asyncio.sleep(0.1)
 
