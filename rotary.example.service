@@ -5,8 +5,8 @@ After=multi-user.target
 
 [Service]
 Type=simple
-User=tylerhill
-ExecStart=/usr/bin/python3 /home/tylerhill/Documents/rotary/rotary/src/main.py --headless
+User=gotyh
+ExecStart=/home/gotyh/Documents/rotary/rotary/venv/bin/python /home/gotyh/Documents/rotary/rotary/src/main.py --headless
 KillSignal=SIGTERM
 TimeoutStopSec=1
 Restart=on-failure

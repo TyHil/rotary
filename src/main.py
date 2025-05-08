@@ -183,7 +183,7 @@ GPIO.output(UART_PIN, 1)
 # Send any bytes
 def sendToArduinoRaw(data):
     GPIO.output(UART_PIN, 0)
-    ser = serial.Serial("/dev/ttyS0", 9600, timeout=1)
+    ser = serial.Serial("/dev/serial0", 9600, timeout=1)
     ser.reset_input_buffer()
     ser.write(bytes(data + [sum(data) % 256]))
     time.sleep(2)

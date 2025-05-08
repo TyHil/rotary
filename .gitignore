@@ -1,3 +1,5 @@
 config.py
 alarms.py
 __pycache__
+venv
+
