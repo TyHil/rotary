@@ -218,13 +218,13 @@ async def arduino(queue: asyncio.Queue):
         number = await queue.get()
         if number == 5:  # white
             alarmStopEarly.set()
-            sendToArduino(1, 51, 0)
+            sendToArduino(1, 119, 0)
         elif number == 6:  # RGB
             alarmStopEarly.set()
-            sendToArduino(1, 51, 1)
+            sendToArduino(1, 119, 1)
         elif number == 7:  # pink
             alarmStopEarly.set()
-            sendToArduino(1, 85, 6, [255, 105, 180])
+            sendToArduino(1, 153, 6, [255, 105, 180])
         else:
             print("No arduino action for " + str(number), flush=True)
         queue.task_done()
@@ -257,12 +257,12 @@ def alarmResponse():
         color = [0, 255, 0]  # green
     elif alarmState == AlarmState.skip:
         color = [255, 255, 0]  # yellow
-    old = sendToArduino(1, 51, 6, color)
+    old = sendToArduino(1, 119, 6, color)
     time.sleep(2)
     if old is not None:
         sendToArduinoRaw([1] + [x for x in old])
     else:
-        sendToArduino(1, 51, 1)
+        sendToArduino(1, 119, 1)
 
 
 # Change alarm state
@@ -291,8 +291,8 @@ async def alarm(smartThingsQueue: asyncio.Queue):
             await smartThingsQueue.put(["ledStrip", "on"])
             await smartThingsQueue.join()
             await asyncio.sleep(10)
-            sendToArduino(0, 5, 0)
-            for brightness in range(17 * 2, 17 * 7 + 1, 17):
+            sendToArduino(0, 17, 0)
+            for brightness in range(17 * 3, 17 * 7 * 2 + 1, 17 * 2):
                 if alarmStopEarly.is_set():
                     break
                 await asyncio.sleep(60 * 5)
