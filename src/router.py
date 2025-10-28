@@ -2,6 +2,7 @@
 
 import asyncio
 
+
 async def router(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
     while True:
         number = await inQueue.get()
@@ -19,4 +20,3 @@ async def router(inQueue: asyncio.Queue, outQueues: list[asyncio.Queue]):
         await asyncio.gather(*map(lambda index: outQueues[index].put(number), routes))
         inQueue.task_done()
         await asyncio.sleep(0.1)
-

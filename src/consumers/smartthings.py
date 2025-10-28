@@ -9,9 +9,7 @@ url = "https://api.smartthings.com"
 def smartThingsConsumer(token: string):
     async def inner(queue: asyncio.Queue):
         # setup
-        request = requests.get(
-            url + "/devices", headers={"Authorization": "Bearer " + token}
-        )
+        request = requests.get(url + "/devices", headers={"Authorization": "Bearer " + token})
         result = request.json()
         devices = {}
         devices["ledStrip"] = {}
@@ -47,6 +45,7 @@ def smartThingsConsumer(token: string):
                 print("Invalid device/command: " + device + " " + command, flush=True)
             queue.task_done()
             await asyncio.sleep(0.1)
+
     return inner
 
 
@@ -72,4 +71,3 @@ async def smartThingsRouter(inQueue: asyncio.Queue, outQueue: asyncio.Queue):
             print("No SmartThings action for " + str(number), flush=True)
         inQueue.task_done()
         await asyncio.sleep(0.1)
-

@@ -20,4 +20,3 @@ async def terminalProducer(queue: asyncio.Queue):
             except ValueError:
                 continue
             await asyncio.sleep(0.1)
-

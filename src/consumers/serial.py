@@ -57,4 +57,3 @@ async def arduinoConsumer(queue: asyncio.Queue):
             print("No arduino action for " + str(number), flush=True)
         queue.task_done()
         await asyncio.sleep(0.1)
-
