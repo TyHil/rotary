@@ -292,7 +292,7 @@ async def alarm(smartThingsQueue: asyncio.Queue):
             await smartThingsQueue.join()
             await asyncio.sleep(10)
             sendToArduino(0, 17, 0)
-            for brightness in range(17 * 3, 17 * 7 * 2 + 1, 17 * 2):
+            for brightness in range(17 * 2, 17 * 7 + 1, 17):
                 if alarmStopEarly.is_set():
                     break
                 await asyncio.sleep(60 * 5)
