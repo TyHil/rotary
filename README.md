@@ -13,6 +13,7 @@ Specialized Python program run on my Raspberry Pi that interfaces with a rotary 
 
 ```
 git clone https://github.com/TyHil/rotary.git
+cd rotary
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -26,11 +27,11 @@ pip install -r requirements.txt
 
 5. Run `cp rotary.example.service /etc/systemd/system/rotary.service`, edit the new file to have the correct `User` and `ExecStart` for you, and run `sudo systemctl daemon-reload`.
 
-6. Optionally add the contents of `example.bash_aliases` to your `~/.bash_aliases` or run `mv example.bash_aliases ~/.bash_aliases`.
+6. Add the contents of `example.bash_aliases` to your `~/.bash_aliases` or run `mv example.bash_aliases ~/.bash_aliases`.
 
 7. Connect your rotary dial to GND and GPIO18 (pins 6 and 12) and your RPI->Arduino to 3V3->3V3, GPIO4->GND, GPIO14->RX, and GPIO15->TX (pins 1, 7, 8, and 12). Use a voltage level-shifter if your Arduino does not run in 3.3 volts.
 
-8. Finally run `source ~/.bash_aliases` and `rotary start` to start the progam.
+8. Finally run `source ~/.bash_aliases` and `rotary start` to start the program.
 
 ## License
 
