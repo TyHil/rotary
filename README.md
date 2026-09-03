@@ -27,7 +27,7 @@ pip install -r requirements.txt
 
 5. Run `cp rotary.example.service /etc/systemd/system/rotary.service`, edit the new file to have the correct `User` and `ExecStart` for you, and run `sudo systemctl daemon-reload`.
 
-6. Add the contents of `example.bash_aliases` to your `~/.bash_aliases` or run `mv example.bash_aliases ~/.bash_aliases`.
+6. Add the contents of `example.bash_aliases` to your `~/.bash_aliases` or run `cp example.bash_aliases ~/.bash_aliases`.
 
 7. Connect your rotary dial to GND and GPIO18 (pins 6 and 12) and your RPI->Arduino to 3V3->3V3, GPIO4->GND, GPIO14->RX, and GPIO15->TX (pins 1, 7, 8, and 12). Use a voltage level-shifter if your Arduino does not run in 3.3 volts.
 
