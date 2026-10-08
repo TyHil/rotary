@@ -10,6 +10,8 @@ from enum import Enum
 import requests
 import serial
 import RPi.GPIO as GPIO
+import gpiod
+from gpiod.line import Bias, Direction, Edge, Value
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.base import BaseTrigger
 from apscheduler.triggers.cron import CronTrigger
@@ -23,22 +25,46 @@ atexit.register(GPIO.cleanup)
 
 # Rotary Producer
 
-ROTARY_PIN = 12
-GPIO.setup(ROTARY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+ROTARY_CHIP = "/dev/gpiochip0"
+ROTARY_LINE = 18  # BCM number of physical pin 12
+
+rotaryRequest = None
+
+
+def closeRotary():
+    global rotaryRequest
+    if rotaryRequest is not None:
+        rotaryRequest.release()
+        rotaryRequest = None
+
+
+atexit.register(closeRotary)
 
 
 # Kernel notifies on each pulse.
-# GPIO callback runs on RPi.GPIO's own thread, so use call_soon_threadsafe.
 def setupRotary(
     queue: asyncio.Queue,
     loop: asyncio.AbstractEventLoop,
     dialHasFinishedRotatingAfter=0.3,
     settleTime=0.015,
 ):
+    global rotaryRequest
     count = 0
     finishTimer = None
     settleTimer = None
-    stableLevel = GPIO.input(ROTARY_PIN)
+
+    rotaryRequest = gpiod.request_lines(
+        ROTARY_CHIP,
+        consumer="rotary",
+        config={
+            ROTARY_LINE: gpiod.LineSettings(
+                direction=Direction.INPUT,
+                edge_detection=Edge.BOTH,
+                bias=Bias.PULL_UP,
+            )
+        },
+    )
+    stableLevel = rotaryRequest.get_value(ROTARY_LINE) == Value.ACTIVE
 
     def flush():  # the dial stopped moving, report the digit
         nonlocal count, finishTimer
@@ -49,27 +75,24 @@ def setupRotary(
     def settle():  # the pin has been quiet for settleTime: trust its level
         nonlocal count, finishTimer, settleTimer, stableLevel
         settleTimer = None
-        level = GPIO.input(ROTARY_PIN)
+        level = rotaryRequest.get_value(ROTARY_LINE) == Value.ACTIVE
         if level == stableLevel:
             return  # it bounced and came back, no real change
         stableLevel = level
-        if level == GPIO.HIGH:  # a real pulse
+        if level:  # a real pulse
             count += 1
             if finishTimer is not None:
                 finishTimer.cancel()
             finishTimer = loop.call_later(dialHasFinishedRotatingAfter, flush)
 
-    def edge():  # any edge, rising or falling: restart the settle timer
+    def onEdge():  # any edge, rising or falling: restart the settle timer
         nonlocal settleTimer
+        rotaryRequest.read_edge_events()  # drain everything queued, including bounce
         if settleTimer is not None:
             settleTimer.cancel()
         settleTimer = loop.call_later(settleTime, settle)
 
-    GPIO.add_event_detect(
-        ROTARY_PIN,
-        GPIO.BOTH,
-        callback=lambda channel: loop.call_soon_threadsafe(edge),
-    )
+    loop.add_reader(rotaryRequest.fileno(), onEdge)
 
 
 # Terminal Input Producer
@@ -364,7 +387,9 @@ async def restart(queue: asyncio.Queue):
     while True:
         number = await queue.get()
         if number == 10:
-            GPIO.cleanup()  # os.execl skips atexit handlers
+            # os.execl skips atexit handlers
+            closeRotary()
+            GPIO.cleanup()
             os.execl(sys.executable, sys.executable, *sys.argv)
         else:
             print("No restart action for " + str(number), flush=True)
