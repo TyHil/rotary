@@ -7,6 +7,7 @@ After=multi-user.target
 Type=simple
 User=gotyh
 ExecStart=/home/gotyh/Documents/rotary/rotary/venv/bin/python /home/gotyh/Documents/rotary/rotary/src/main.py --headless
+WorkingDirectory=/home/gotyh/Documents/rotary/working-directory
 KillSignal=SIGTERM
 TimeoutStopSec=1
 Restart=on-failure
