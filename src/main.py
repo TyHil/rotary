@@ -460,6 +460,7 @@ async def alarmSchedule(smartThingsQueue: asyncio.Queue):
                 startEarly,
             ),
             args=[smartThingsQueue],
+            misfire_grace_time=300,  # allow running up to 5 mins late
         )
     scheduler.start()
     try:
