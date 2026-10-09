@@ -9,7 +9,6 @@ from enum import Enum
 
 import requests
 import serial
-import RPi.GPIO as GPIO
 import gpiod
 from gpiod.line import Bias, Direction, Edge, Value
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -19,26 +18,29 @@ from apscheduler.triggers.cron import CronTrigger
 import alarms  # defines times
 import config  # defines smartThingsToken
 
-GPIO.setmode(GPIO.BOARD)
-atexit.register(GPIO.cleanup)
+# GPIO
 
-
-# Rotary Producer
-
-ROTARY_CHIP = "/dev/gpiochip0"
+GPIO_CHIP = "/dev/gpiochip0"
 ROTARY_LINE = 18  # BCM number of physical pin 12
+UART_LINE = 4  # BCM number of physical pin 7
 
 rotaryRequest = None
+uartRequest = None
 
 
 def closeRotary():
-    global rotaryRequest
-    if rotaryRequest is not None:
-        rotaryRequest.release()
-        rotaryRequest = None
+    global rotaryRequest, uartRequest
+    for request in (rotaryRequest, uartRequest):
+        if request is not None:
+            request.release()
+    rotaryRequest = None
+    uartRequest = None
 
 
 atexit.register(closeRotary)
+
+
+# Rotary Producer
 
 
 # Kernel notifies on each pulse.
@@ -54,7 +56,7 @@ def setupRotary(
     settleTimer = None
 
     rotaryRequest = gpiod.request_lines(
-        ROTARY_CHIP,
+        GPIO_CHIP,
         consumer="rotary",
         config={
             ROTARY_LINE: gpiod.LineSettings(
@@ -241,9 +243,16 @@ async def smartThingsRouter(inQueue: asyncio.Queue, outQueue: asyncio.Queue):
 
 # Arduino Serial Consumer
 
-UART_PIN = 7
-GPIO.setup(UART_PIN, GPIO.OUT)
-GPIO.output(UART_PIN, 1)
+uartRequest = gpiod.request_lines(
+    GPIO_CHIP,
+    consumer="arduino-uart",
+    config={UART_LINE: gpiod.LineSettings(direction=Direction.OUTPUT, output_value=Value.ACTIVE)},
+)
+
+
+def setUart(high: bool):
+    uartRequest.set_value(UART_LINE, Value.ACTIVE if high else Value.INACTIVE)
+
 
 arduinoLock = threading.RLock()
 
@@ -252,7 +261,7 @@ arduinoLock = threading.RLock()
 def sendToArduinoRaw(data, maxAttempts=5):
     with arduinoLock:
         for attempt in range(maxAttempts):
-            GPIO.output(UART_PIN, 0)
+            setUart(False)
             try:
                 with serial.Serial("/dev/serial0", 9600, timeout=1) as ser:
                     ser.reset_input_buffer()
@@ -265,7 +274,7 @@ def sendToArduinoRaw(data, maxAttempts=5):
                         # print(type(response), response, response[0], response[1], response[2], response[3], response[4], flush=True)
                         return ser.read(5)
             finally:
-                GPIO.output(UART_PIN, 1)
+                setUart(True)
             time.sleep(2)
         print("Arduino still busy after " + str(maxAttempts) + " attempts", flush=True)
         return None
@@ -388,8 +397,7 @@ async def restart(queue: asyncio.Queue):
         number = await queue.get()
         if number == 10:
             # os.execl skips atexit handlers
-            closeRotary()
-            GPIO.cleanup()
+            closeGpio()
             os.execl(sys.executable, sys.executable, *sys.argv)
         else:
             print("No restart action for " + str(number), flush=True)

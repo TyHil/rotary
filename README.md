@@ -12,7 +12,6 @@ Specialized Python program run on my Raspberry Pi that interfaces with a rotary 
 1. Clone the project and install packages:
 
 ```
-mkdir -p working-directory
 git clone https://github.com/TyHil/rotary.git
 cd rotary
 python3 -m venv venv
