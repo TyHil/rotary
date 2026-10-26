@@ -1,5 +1,5 @@
 APScheduler==3.11.3
-black==26.10.0
+black==26.10.1
 certifi==2026.10.19
 charset-normalizer==3.5.2
 click==8.5.0
